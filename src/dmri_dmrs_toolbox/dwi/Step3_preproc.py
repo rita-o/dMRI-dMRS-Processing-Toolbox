@@ -120,7 +120,21 @@ def Step3_preproc(cfg):
                       
                         # refine mask (interactive)
                         new_thr = interactive_brain_mask_refine(bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'), subj_data, cfg)
-                       
+                        
+                    
+                    elif cfg['algo_brainextract']=='thr':
+                        # create intial brain mask
+                        print('\n >> Thresholding brain map for brain extraction.')
+                        # Get initial threshold for the anatomical image
+                        mask = subj_data['acqType'].str.contains('T2W|T1W', case=False)
+                        anat_thr = float(subj_data.loc[mask, 'anat_thr'].iloc[0])
+                      
+                        make_mask(bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'), 
+                                  bids_strc_anat.get_path(f'{anat_format}_bc_brain_mask.nii.gz'), anat_thr, cfg)
+
+                        # refine mask (interactive)
+                        new_thr = interactive_brain_mask_refine(bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'), subj_data, cfg)
+
                     print('Saving new anat threshold to the excel')
                     mask_scan =  (scan_list['study_name'] == subj) & (scan_list['acqType'].str.contains('T2W|T1W', case=False))
                     scan_list.loc[mask_scan, 'anat_thr'] = new_thr
@@ -248,10 +262,10 @@ def Step3_preproc(cfg):
                          #brain_extract_organoids(paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_bc.nii.gz'),cfg['anat_thr'])
                          #make_mask(paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_bc_brain.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_mask.nii.gz'), 1e4)                
 
-                         # pad image temporarily for registration
-                         pad_image(bids_strc_anat.get_path(f'{anat_format}_bc_brain.nii.gz'), bids_strc_anat.get_path(f'{anat_format}_bc_brain.nii.gz'))
-                         pad_image(bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'), bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'))
-                         pad_image(paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_bc.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_bc.nii.gz'))
+                        # pad image temporarily for registration
+                        pad_image(bids_strc_anat.get_path(f'{anat_format}_bc_brain.nii.gz'), bids_strc_anat.get_path(f'{anat_format}_bc_brain.nii.gz'))
+                        pad_image(bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'), bids_strc_anat.get_path(f'{anat_format}_bc.nii.gz'))
+                        pad_image(paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_bc.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_bc.nii.gz'))
                          
                     # register dwi --> T2w
                     antsreg_full(bids_strc_anat.get_path(f'{anat_format}_bc_brain.nii.gz'), # fixed
@@ -273,7 +287,7 @@ def Step3_preproc(cfg):
                         unpad_image(paths_dwi_fwd[kk].replace('dwi.nii.gz', f'{anat_format}_in_dwi.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', f'{anat_format}_in_dwi.nii.gz'))
                         unpad_image(paths_dwi_fwd[kk].replace('dwi.nii.gz', f'{anat_format}_brain_in_dwi.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', f'{anat_format}_brain_in_dwi.nii.gz'))
                         unpad_image(paths_dwi_fwd[kk].replace('dwi.nii.gz', f'dwi2{anat_format}.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', f'dwi2{anat_format}.nii.gz'))
-                     
+                         
                     # create mask
                     make_mask(paths_dwi_fwd[kk].replace('dwi.nii.gz', f'{anat_format}_brain_in_dwi.nii.gz'), paths_dwi_fwd[kk].replace('dwi.nii.gz', 'b0_avg_mask.nii.gz'), 100, cfg)                
                     
@@ -290,8 +304,15 @@ def Step3_preproc(cfg):
                 if not os.path.exists(paths_dwi_rev[kk].replace('dwi.nii.gz', 'b0_avg.nii.gz')) or cfg['redo_b0_extract']:
                   
                     # since rev is only b0, just copy the file and rename it
-                    copy_files([paths_dwi_rev[kk]],[paths_dwi_rev[kk].replace('dwi.nii.gz', 'b0.nii.gz')])
-                   
+                    #copy_files([paths_dwi_rev[kk]],[paths_dwi_rev[kk].replace('dwi.nii.gz', 'b0.nii.gz')])
+                    
+                    # extract b0
+                    extract_b0(    [paths_dwi_rev[kk]], \
+                                    [paths_dwi_rev[kk].replace('dwi.nii.gz', 'bvecs.txt')], \
+                                    [paths_dwi_rev[kk].replace('dwi.nii.gz', 'bvalsNom.txt')], \
+                                    [paths_dwi_rev[kk].replace('dwi.nii.gz', 'b0.nii.gz')],
+                                    cfg)
+
                     # average b0 - if its just one volume it will be the same, but it's needed if more than one volume are acquired
                     make_avg(3, [paths_dwi_rev[kk].replace('dwi.nii.gz', 'b0.nii.gz')], [paths_dwi_rev[kk].replace('dwi.nii.gz', 'b0_avg.nii.gz')],cfg)
                     

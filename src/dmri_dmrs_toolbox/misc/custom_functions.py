@@ -411,7 +411,7 @@ def create_topup_input_files(bids_strc, topupcfg_path):
 
     topup_input_files['b0_fwd_rev'] = bids_strc.get_path('b0_fwd_rev.nii.gz')
 
-    if any(dim <= 20 for dim in nib.load(bids_strc.get_path('b0_fwd_rev.nii.gz')).shape[:3]):
+    if any(dim <= 21 for dim in nib.load(bids_strc.get_path('b0_fwd_rev.nii.gz')).shape[:3]):
         print('Your data is a slab and that is not good for topup and eddy, we are padding it with zeros')
         data = bids_strc.get_path('b0_fwd_rev.nii.gz')
         data_pad = data.replace('.nii.gz','_padded.nii.gz')
@@ -474,7 +474,7 @@ def apply_topup(topup_input_files, dwi_path, bids_strc, cfg):
     topup = bids_strc.get_path('b0_topup_fieldcoef')
     out = dwi_path.replace('.nii.gz', '_topup.nii.gz')
 
-    if any(dim <= 20 for dim in nib.load(imain).shape[:3]):
+    if any(dim <= 21 for dim in nib.load(imain).shape[:3]):
          print('Your data is a slab and that is not good for topup and eddy, we are padding it with zeros')
          pad_image(imain, imain.replace('.nii.gz','_padded.nii.gz'))
          imain = imain.replace('.nii.gz','_padded.nii.gz')
@@ -572,7 +572,7 @@ def do_eddy(eddy_input_files, cfg):  # rita addes repol and slm linear
     # that dimension otherwise eddy has problems and crashes.
     # I dont understand really deeply the cause of this problem but this seems
     # to be a good workaround
-    if any(dim <= 20 for dim in nib.load(mask).shape[:3]):
+    if any(dim <= 21 for dim in nib.load(mask).shape[:3]):
         dwi_pad = dwi.replace('.nii.gz','_padded.nii.gz')
         mask_pad = mask.replace('.nii.gz','_padded.nii.gz')
         pad_image(mask, mask_pad)
@@ -1515,10 +1515,17 @@ def extract_methods(methods_in, bids_strc, acqp, cfg=None):
                         line = next(f)
                 if '##$PVM_DwEffBval=' in line:
                     line = next(f)
-                    while not '##$PVM_' in line:
-                        bvals_eff.extend([float(x) for x in line.split()])
+                    while '##$PVM_' not in line:
+                        for tok in line.split():
+                            if tok.startswith('@'):
+                                m = re.match(r'@(\d+)\*\(([^)]+)\)', tok)
+                                n = int(m.group(1))
+                                v = float(m.group(2))
+                                bvals_eff.extend([v] * n)
+                            else:
+                                bvals_eff.append(float(tok))
                         line = next(f)
-
+                        
         if PV_version == 'V1.1':
 
             # Reshape and duplicate initial dirs matrix for all the shells
@@ -2673,7 +2680,7 @@ def gibbs_corr(input_path, output_path, cfg):
     os.system(' '.join(call))
 
 
-def make_avg(dim, input_path, output_path, cfg):  # rita
+def make_avg(dim, input_path, output_path, cfg):  
 
     for ii in range(len(input_path)):
 
@@ -2687,8 +2694,7 @@ def make_avg(dim, input_path, output_path, cfg):  # rita
                 f'-o {output}']
 
         os.system(' '.join(call))
-
-
+        
 def calc_snr(input_path1, input_path2, output_path, cfg):
     
     binary_op(input_path1, input_path2, '-div', output_path, cfg)
@@ -2816,7 +2822,7 @@ def interactive_brain_mask_refine(anat_path, subj_data, cfg, thr_mask_col='acqTy
     return anat_thr
 
 
-def brain_extract_organoids(input_path,val):
+def brain_extract_organoids(input_path,val, cfg):
     
     #Make brain mask
     make_mask(input_path, input_path.replace(".nii.gz", "_brain_mask.nii.gz"), val)
@@ -2929,10 +2935,14 @@ def reorient_nifit(file_path, new_orient, cfg):
         
         # the new direction x -z -y is found by trial and error to match the default MNI.
         # this will give a warning saying the L/R directions were flipped, but we will put them back later
-        call = [f'fslswapdim {file_path} x -z -y {file_path}']
+        exe = os.path.join(cfg["fsl_path"], "fslswapdim")
+        call = [exe,
+                f'{file_path} x -z -y {file_path}']
         os.system(' '.join(call))
         
-        call = [f'fslorient -setqformcode 1 {file_path}']
+        exe = os.path.join(cfg["fsl_path"], "fslorient")
+        call = [exe,
+            f'-setqformcode 1 {file_path}']
         os.system(' '.join(call))
         
         ## Put back the header ##
@@ -2950,11 +2960,26 @@ def reorient_nifit(file_path, new_orient, cfg):
         new_affine[2]=affine[1]
         temp = new_affine[2,1:3] 
         new_affine[2,1:3] = temp[::-1]
+
+        # Put non diagonal elements to zero
+        A = new_affine[:3, :3]
+        off_diag_mask = ~np.eye(3, dtype=bool)
+        if np.any(np.abs(A[off_diag_mask]) > 1e-8):
+            print("Warning: Non-diagonal elements detected in affine. "
+                  "Forcing diagonal orientation (removing shear/rotation).")
+            
+            # zero off-diagonal elements
+            new_affine[:3, :3] = np.diag(np.diag(A))
         
         # Save the new image
         img = nib.load(file_path)
         new_img = nib.Nifti1Image(img.get_fdata(), affine=new_affine, header=img.header)
         nib.save(new_img, file_path)
+        
+        exe = os.path.join(cfg["fsl_path"], "fslreorient2std")
+        call = [exe,
+            f'{file_path} {file_path}']
+        os.system(' '.join(call))
     
         
     else:

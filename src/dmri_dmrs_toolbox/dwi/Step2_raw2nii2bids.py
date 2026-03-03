@@ -64,8 +64,11 @@ def Step2_raw2nii2bids(cfg):
                                 if '##$ACQ_scan_name=' in line: 
                                     match=re.search(r'\((.*?)\)',next(f))
                                     ref_name=match.group(1)[1:] 
-                        nii_path    = os.path.join(nifti_path,str(scan_no) + '_1_' + 'ADJ_REVPE_E' + ref_name)
                     
+                        if 'V3.5' in subj_data['PV'][scn_ctr]:
+                            nii_path    = os.path.join(nifti_path,str(scan_no) + '_1_' + 'ADJ_REVPE_E' + ref_name)
+                        elif  'V1.1' in subj_data['PV'][scn_ctr]:
+                            nii_path    = os.path.join(nifti_path,str(scan_no) + '_1_' + subj_data['acqSeq'][scn_ctr])
                     bids_strc.set_param(datatype='dwi',description='Delta_'+str(int(subj_data['diffTime'][scn_ctr]))+'_'+subj_data['phaseDir'][scn_ctr])
 
                     # Transfer files
