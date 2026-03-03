@@ -63,7 +63,7 @@ def Step1_fill_study_excel(cfg):
                         diff_time = next(f)
                         list_methods.at[ii, 'diffTime'] = float(diff_time)
     
-                    if '##$ReversePEAdjRunning=' in line:
+                    if '##$ReversePEAdjRunning='  in line or 'EPI_YN_ForwardReverseMode' in line:
                         rev_opt = line.split('=')[1]
                         if rev_opt.strip() == 'No':
                             list_methods.at[ii, 'phaseDir'] = 'fwd'
