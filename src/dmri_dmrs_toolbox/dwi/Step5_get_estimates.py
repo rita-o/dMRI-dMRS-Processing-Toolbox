@@ -122,7 +122,13 @@ def Step5_get_estimates(cfg):
                         ROI_list.append('voxel_mrs');
                         if TPMs:
                             ROI_list.append('voxel_mrs_GM')
- 
+                            
+                    # If there is a lesion mask, add it as a ROI
+                    if cfg['ROIs_manual']:
+                        ROI_list.extend(cfg['ROIs_manual'])
+                        if TPMs:
+                            ROI_list.extend(cfg['ROIs_manual'])
+                        
                     ######## EXTRACT MODEL ESTIMATES ########
                     # Option 1. Extract estimates with user defined ROIs
                     
@@ -397,7 +403,7 @@ def Step5_get_estimates(cfg):
             ######## EXTRACT DTI,DKI ESTIMATES ########
             ######## OPERATIONS INVOLVING THE NEED OF AN ATLAS  ########
 
-            ROI_list = cfg['ROIs_GM'] + cfg['ROIs_WM']
+            ROI_list = cfg['ROIs_GM'] + cfg['ROIs_WM'] + cfg['ROIs_manual']
             
             patterns, lims, maximums = get_param_names_model('DTI_DKI',cfg['is_alive'])
             cleaned_patterns = [re.sub(r'\*{2,}', '*', re.sub('DTI_DKI', '', p, flags=re.IGNORECASE).replace('[^s]', '')).strip('*') for p in patterns]          
@@ -410,7 +416,7 @@ def Step5_get_estimates(cfg):
                  ROI_list.append('voxel_mrs'); 
                  if TPMs:
                      ROI_list.append('voxel_mrs_GM')
-
+            
             Data_DTIDKI    = np.empty((len(Delta_list), len(ROI_list), len(patterns)), dtype=object)
             Data_DTIDKI_l  = np.empty((len(Delta_list), len(ROI_list), len(patterns)), dtype=object)
             Data_DTIDKI_r  = np.empty((len(Delta_list), len(ROI_list), len(patterns)), dtype=object)
@@ -432,15 +438,18 @@ def Step5_get_estimates(cfg):
                 atlas = bids_strc_reg.get_path('atlas_in_dwi.nii.gz')
             
                 # Define atlas labels 
-                if 'anat_space_organoids' not in  cfg['atlas'] :
-                    atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(cfg['common_folder'], cfg['atlas'], '*label*'))[0])
+                if cfg['atlas']:
+                    if 'anat_space_organoids' not in  cfg['atlas']:
+                        atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(cfg['common_folder'], cfg['atlas'], '*label*'))[0])
+                    else:
+                        bids_strc_anat = create_bids_structure(subj=subj, sess=sess, datatype='anat', root=data_path, 
+                                                   folderlevel='derivatives', workingdir=cfg['prep_foldername'])   
+                        atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(bids_strc_anat.get_path(), '*label*'))[0])
                 else:
-                    bids_strc_anat = create_bids_structure(subj=subj, sess=sess, datatype='anat', root=data_path, 
-                                               folderlevel='derivatives', workingdir=cfg['prep_foldername'])   
-                    atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(bids_strc_anat.get_path(), '*label*'))[0])
-     
+                    atlas_labels=''
+                    
                 # Define TPMs
-                if cfg['atlas_TPM']:
+                if cfg['atlas_TPM'] :
                     bids_strc_reg_TPM  = create_bids_structure(subj=subj, sess=sess, datatype='registration', description=cfg['atlas_TPM']+'-To-'+'allDelta-allb', root=cfg['data_path'] , 
                                              folderlevel='derivatives', workingdir=cfg['analysis_foldername'])
                     bids_strc_reg_TPM.set_param(base_name='')
@@ -452,8 +461,11 @@ def Step5_get_estimates(cfg):
                     TPMs = []
                              
                 # Get data
-                if os.path.exists(atlas) and os.path.exists(output_path):
-                    
+                if cfg['atlas'] != '' and not os.path.exists(atlas):
+                    raise FileNotFoundError(f"Atlas file not found: {atlas}")
+
+                if os.path.exists(output_path):
+                        
                     # Get values of parameters inside the ROIs        
                     Data, Data_all, Data_all_l, Data_all_r = get_values_within_ROI(
                         ROI_list, atlas, atlas_labels, TPMs, cfg['tpm_thr'], 
@@ -564,7 +576,11 @@ def Step5_get_estimates(cfg):
                         s=np.vectorize(np.nanstd, otypes=[float])(Data_DTIDKI[:, :, i])
                         lower = round(np.floor(np.nanmin(m-s)/0.05) * 0.05,2)
                         upper = round(np.ceil(np.nanmax(m+s)/0.05) * 0.05,2)
-                        
+                    if np.isnan(lower):
+                        lower = 0
+                    if np.isnan(upper):
+                        upper = 1
+                                            
                     a.set_ylim([lower, upper])
                     a.set_yticks([lower, upper])
                     
@@ -598,7 +614,7 @@ def Step5_get_estimates(cfg):
                 
             ######## EXTRACT MicroFA ESTIMATES ########
             ######## OPERATIONS INVOLVING THE NEED OF AN ATLAS  ########
-            ROI_list = cfg['ROIs_GM'] + cfg['ROIs_WM']
+            ROI_list = cfg['ROIs_GM'] + cfg['ROIs_WM'] + cfg['ROIs_manual']
 
             bids_STE      = create_bids_structure(subj=subj, sess=sess, datatype='dwi_STE', root=cfg['data_path'] , 
                           folderlevel='derivatives', workingdir=cfg['analysis_foldername'],description='microFA')               
@@ -613,13 +629,16 @@ def Step5_get_estimates(cfg):
                 print(f'Getting model estimates from Micro FA...')
 
                 # Define atlas labels 
-                if 'anat_space_organoids' not in  cfg['atlas'] :
-                    atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(cfg['common_folder'], cfg['atlas'], '*label*'))[0])
+                if cfg['atlas']:
+                    if 'anat_space_organoids' not in  cfg['atlas'] :
+                        atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(cfg['common_folder'], cfg['atlas'], '*label*'))[0])
+                    else:
+                        bids_strc_anat = create_bids_structure(subj=subj, sess=sess, datatype='anat', root=data_path, 
+                                                   folderlevel='derivatives', workingdir=cfg['prep_foldername'])   
+                        atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(bids_strc_anat.get_path(), '*label*'))[0])
                 else:
-                    bids_strc_anat = create_bids_structure(subj=subj, sess=sess, datatype='anat', root=data_path, 
-                                               folderlevel='derivatives', workingdir=cfg['prep_foldername'])   
-                    atlas_labels = prepare_atlas_labels(cfg['atlas'], glob.glob(os.path.join(bids_strc_anat.get_path(), '*label*'))[0])
-
+                    atlas_labels=''
+                    
                 # Define TPMs
                 if cfg['atlas_TPM']:
                     bids_strc_reg_TPM  = create_bids_structure(subj=subj, sess=sess, datatype='registration', description=cfg['atlas_TPM']+'-To-'+'allDelta-allb', root=cfg['data_path'] , 
@@ -640,7 +659,7 @@ def Step5_get_estimates(cfg):
                     ROI_list.append('voxel_mrs'); 
                     if TPMs:
                         ROI_list.append('voxel_mrs_GM')
-                    
+                        
                 # Determine output file
                 outfile = os.path.join(os.path.dirname(os.path.dirname(output_path)), f"output_ROIs_{cfg['atlas']}_Micro_FA.xlsx")
                 outfile2 = os.path.join(os.path.dirname(os.path.dirname(output_path)), f"output_ROIs_{cfg['atlas']}_Micro_FA.npy")
@@ -677,12 +696,13 @@ def Step5_get_estimates(cfg):
                         np.save(outfile2.replace('.npy','_right.npy'), df_data_r)
                 
             ######## MAKE ROI MAP ########
-            bids_strc_reg  = create_bids_structure(subj=subj, sess=sess, datatype='registration', description=cfg['atlas']+'-To-'+'allDelta-allb', root=data_path, 
-                                          folderlevel='derivatives', workingdir=cfg['analysis_foldername'])
-            bids_strc_reg.set_param(base_name='')
-            
-            roi_paths =  []
-            for ROI in cfg['ROIs_GM'] + cfg['ROIs_WM']:
-                roi_paths.append(bids_strc_reg.get_path(f'mask_{ROI}.nii.gz'))
-           
-            QA_ROIs(roi_paths, bids_strc_reg.get_path('ref_dwi.nii.gz'), bids_strc_reg.get_path(),cfg)
+            if cfg['ROIs_GM'] + cfg['ROIs_WM']:
+                bids_strc_reg  = create_bids_structure(subj=subj, sess=sess, datatype='registration', description=cfg['atlas']+'-To-'+'allDelta-allb', root=data_path, 
+                                              folderlevel='derivatives', workingdir=cfg['analysis_foldername'])
+                bids_strc_reg.set_param(base_name='')
+                
+                roi_paths =  []
+                for ROI in cfg['ROIs_GM'] + cfg['ROIs_WM']:
+                    roi_paths.append(bids_strc_reg.get_path(f'mask_{ROI}.nii.gz'))
+               
+                QA_ROIs(roi_paths, bids_strc_reg.get_path('ref_dwi.nii.gz'), bids_strc_reg.get_path(),cfg)

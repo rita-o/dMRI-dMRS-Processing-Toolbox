@@ -401,7 +401,7 @@ def Step3_preproc(cfg):
                         create_directory(bids_strc.get_path())
                         bvals_aux = np.loadtxt(o_bids_strc.get_path('bvalsNom.txt'))
                         if cfg['is_alive']=='ex_vivo':
-                            desiredbvals = np.unique(bvals_aux[bvals_aux<=4000])
+                            desiredbvals = np.unique(bvals_aux[bvals_aux<=2000])
                         else:
                             desiredbvals = np.unique(bvals_aux[bvals_aux<=1000])
 

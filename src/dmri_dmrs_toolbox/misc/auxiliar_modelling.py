@@ -34,7 +34,7 @@ def Run_model():
         param_lims = None
         if 'Nexi' in model_clean:
             if extra == 'ex_vivo':
-                param_lims = np.array([[1, 150], (0, 2), (0, 2), [0.1, 0.9],[0, 100]])
+                param_lims = np.array([[1, 150], (0.05, 2), (0.05, 2), [0.1, 0.9],[0, 100]])
             elif extra == 'in_vivo':
                 param_lims = np.array([[1, 150], [0.1, 3.5], [0.1, 3.5], [0.1, 0.9], [0, 100]])
         

@@ -208,6 +208,36 @@ def prepare_atlas(atlas_name, atlas_folder, atlas_type):
         atlas      = atlas.replace('.nii.gz', '_crop_lowres.nii.gz')
         template   = template.replace('.nii.gz', '_crop_lowres.nii.gz')
 
+    elif atlas_name== 'Atlas_WHS_mouse' and atlas_type=='atlas':
+
+         # Define atlas 
+         atlas      = glob.glob(os.path.join(atlas_folder, atlas_name, '*atlas.nii.gz'))[0]
+         template   = glob.glob(os.path.join(atlas_folder, atlas_name, '*template_brain.nii.gz'))[0]
+         
+         # If atlas wasn't refined before, do it
+         if (not os.path.exists(atlas.replace('.nii.gz', '_crop_lowres.nii.gz'))) and (not os.path.exists(template.replace('.nii.gz', '_crop_lowres.nii.gz'))):
+             
+             for image in (atlas,template):
+                 
+                 # Crop template/atlas - otherwise too much data to register
+                 img  = nib.load(image)
+                 data = img.get_fdata()
+                 masked_data = np.zeros_like(data)
+                 masked_data[:, 59:739, :] = data[:, 59:739, :]
+                 nib.save(nib.Nifti1Image(masked_data, img.affine), image.replace('.nii.gz', '_crop.nii.gz'))
+                 
+                 # Downsample template/atlas to avoid segmentation faults
+                 input_img = nib.load(image.replace('.nii.gz', '_crop.nii.gz'))
+                 if image==atlas:
+                    resampled_img = nip.resample_to_output(input_img, [0.1, 0.1, 0.1],order=0)
+                 elif image==template:
+                    resampled_img = nip.resample_to_output(input_img, [0.1, 0.1, 0.1])
+                 nib.save(resampled_img,  image.replace('.nii.gz', '_crop_lowres.nii.gz')) 
+       
+         # Define atlas 
+         atlas      = atlas.replace('.nii.gz', '_crop_lowres.nii.gz')
+         template   = template.replace('.nii.gz', '_crop_lowres.nii.gz')
+         
     # If no adjustments need to be made in atlas it just reads the files
     elif atlas_type=='atlas':
    
@@ -318,6 +348,64 @@ def prepare_atlas_labels(atlas_name, atlas_label_path):
         atlas_labels = pd.DataFrame(labels)
         atlas_labels.sort_values(by='IDX', inplace=True)
     
+    elif atlas_label_path.endswith('.ilf'):
+       import xml.etree.ElementTree as ET
+
+       def hex_to_rgb(hex_color: str):
+           """'#RRGGBB' -> (R,G,B). Returns random if malformed."""
+           if not hex_color:
+               return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+           hex_color = hex_color.strip()
+           if hex_color.startswith('#'):
+               hex_color = hex_color[1:]
+           if len(hex_color) != 6:
+               return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+           return (int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16))
+
+       tree = ET.parse(atlas_label_path)
+       root = tree.getroot()
+
+       labels = []
+
+       # In .ilf, labels are nested <label .../> inside <structure>
+       for lbl in root.findall(".//structure//label"):
+           id_str = lbl.attrib.get("id", None)
+           if id_str is None:
+               continue
+
+           try:
+               index = int(id_str)
+           except ValueError:
+               continue
+
+           # Prefer 'name', fallback to 'abbreviation'
+           name = (lbl.attrib.get("name") or lbl.attrib.get("abbreviation") or "").strip()
+
+           # color="#ccbcb0" etc.
+           color_hex = lbl.attrib.get("color", None)
+           R, G, B = hex_to_rgb(color_hex)
+
+           A = 1
+           VIS = 1
+           MSH = 0
+
+           labels.append({
+               'IDX': index,
+               'R': R,
+               'G': G,
+               'B': B,
+               'A': A,
+               'VIS': VIS,
+               'MSH': MSH,
+               'LABEL': name
+           })
+
+       atlas_labels = pd.DataFrame(labels)
+
+       # De-duplicate in case repeated IDs appear (keep first)
+       if not atlas_labels.empty:
+           atlas_labels.sort_values(by='IDX', inplace=True)
+           atlas_labels.drop_duplicates(subset=['IDX'], keep='first', inplace=True)
     
     # If none of the previous, assumes there is an xml file    
     else:
@@ -586,14 +674,100 @@ def create_ROI_mask(atlas, atlas_labels, TPMs, ROI, tpm_thr, bids_strc_reg):
        
         roi_definitions = {
            'Isocortex': ['Isocortex'],
-           'Substantia_Nigra': ['Substantia_Nigra'],
+           'SN': ['Substantia_Nigra'],
            'Cerebellum': ['Cerebellum'],
            'Pallidum': ['Pallidum'],
            'Hypothalamus': ['Hypothalamus'],
-           'Hippocampal_Formation': ['Hippocampal_Formation'],
+           'Hippocampal': ['Hippocampal_Formation'],
            'CC': ['Corpus_Callosum'],
 
        } 
+        
+     elif 'Atlas_WHS_mouse' in atlas:
+      
+        roi_definitions = {
+        # Cortex / telencephalon
+        'Isocortex': [
+            'Cerebral cortex', 'Cerebral cortex'.replace(' ', '_'),
+            'Cerebral cortex'
+        ],
+        'Olfactory_Bulb': [
+            'olfactory bulb', 'olfactory_bulb'
+        ],
+
+        # Hippocampal system
+        'Hippocampal_Formation': [
+            'hippocampal formation', 'hippocampal_formation',
+            'fimbria', 'fornix'
+        ],
+
+        # Basal ganglia / ventral striatum / basal forebrain
+        'Basal_Ganglia': [
+            'striatum',
+            'caudate putamen', 'caudate_putamen',
+            'caudate nucleus', 'caudate_nucleus',
+            'globus pallidus', 'globus_pallidus',
+            'nucleus accumbens', 'nucleus_accumbens',
+            'septal nucleus', 'septal_nucleus',
+            'basal forbrain', 'basal_forbrain'
+        ],
+
+        # Diencephalon
+        'Thalamus': ['thalamus'],
+        'Hypothalamus': ['hypothalamus'],
+        'Epithalamus_Pineal': [
+            'Epithalumus', 'epithalamus',   # (note: typo in the file: "Epithalumus")
+            'pineal gland', 'pineal_gland'
+        ],
+
+        # Midbrain
+        'Midbrain': [
+            'midbrain', 'midbrain unsegmented', 'midbrain_unsegmented',
+            'superior colliculus', 'superior_colliculus',
+            'inferior colliculus', 'inferior_colliculus',
+            'periaqueductal gray', 'periaqueductal_gray',
+            'substantia nigra', 'substantia_nigra',   # appears twice in WHS labels (IDs 24 and 28)
+            'interpeduncular nucleus', 'interpeduncular_nucleus',
+            'fasciculus retroflexus', 'fasciculus_retroflexus',
+            'un-named 01', 'un_named_01'
+        ],
+
+        # Hindbrain
+        'Hindbrain': [
+            'cerebellum',
+            'pons',
+            'medulla'
+        ],
+
+        # Major white matter bundles
+        'WM_Tracts': [
+            'corpus callosum', 'corpus_callosum',
+            'internal capsule', 'internal_capsule',
+            'anterior commissure', 'anterior_commissure'
+        ],
+
+        # Ventricles / CSF
+        'Ventricles': [
+            'lateral ventricles', 'lateral_ventricles',
+            '3rd ventricle', '3rd_ventricle',
+            '4th ventricle', '4th_ventricle'
+        ],
+
+        # Cranial nerves / sensory structures
+        'Cranial_Nerves_Sensory': [
+            'sensory system', 'sensory_system',
+            'cranial nerves', 'cranial_nerves',
+            'optic nerve', 'optic_nerve',
+            'optic chiasm', 'optic_chiasm',
+            'optic tract', 'optic_tract',
+            'trigeminal', 'trigeminal tract', 'trigeminal_tract',
+            'acoustic nerve', 'acoustic_nerve',
+            'inner ear', 'inner_ear'
+        ],
+
+        # Spinal
+        'Spinal_Cord': ['spinal cord', 'spinal_cord'],
+    }
              
      elif 'anat_space_organoids' in atlas:
          

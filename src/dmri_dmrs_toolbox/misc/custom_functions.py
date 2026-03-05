@@ -1690,7 +1690,7 @@ def erode_im(input_path, output_path, sigma, cfg):
 
 def erode_im_fsl(input_path, output_path, cfg):
 
-    exe = os.path.join(cfg["ants_path"], "ImageMath")
+    exe = os.path.join(cfg["fsl_path"], "fslmaths")
     call = [exe,
             f'{input_path}',
             f'-ero -ero -ero -ero',
@@ -3500,13 +3500,13 @@ def get_param_names_model(model, is_alive):
 
     elif model=='DTI_DKI':
         if is_alive=='ex_vivo':
-            patterns = ['*md_dki*','*mk_dki*','*fa_dti*']
+            patterns = ['*md_dki*','*mk_dki*','*fa_dki*']
             lims = [(0.5, 1.5), (0.2, 0.8), (0, 0.2)]
             #maximums = np.full((len(patterns), 2), np.inf)
             #maximums[:, 0] = -np.inf 
             maximums = np.array([[0, 5], [0, 50], [0, 50]])
         else:
-            patterns = ['*md_dki*','*mk_dki*','*fa_dti*']
+            patterns = ['*md_dki*','*mk_dki*','*fa_dki*']
             lims = [(0, 2), (0, 2), (0, 1)]
             #maximums = np.full((len(patterns), 2), np.inf)
             #maximums[:, 0] = -np.inf 
@@ -3733,6 +3733,11 @@ def get_values_within_ROI(ROI_list, atlas, atlas_labels, TPMs, cfg_tpm_thr,
              mask = img.get_fdata()*tmp_GM
              masked_img = nib.Nifti1Image(mask, affine=img.affine, header=img.header)
              nib.save(masked_img, bids_strc_reg.get_path(f'mask_voxel_mrs_GM.nii.gz'))
+         elif ROI == 'lesion':
+            bids_strc_manual = bids_strc_reg
+            bids_strc_manual.set_param(datatype='manual_masks')            
+            bids_strc_manual.set_param(description='')
+            mask = nib.load(bids_strc_manual.get_path('mask_lesion.nii.gz')).get_fdata()
          else:
              mask = create_ROI_mask(atlas, atlas_labels, TPMs, ROI, cfg_tpm_thr, bids_strc_reg)
          
