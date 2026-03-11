@@ -56,7 +56,7 @@ Depending on the level of analysis, run the steps in the following order:
    The pipeline used was:
    <img src="img/Registration.png" alt="Processing Pipeline" width="600">
 
-- **Step4_modelling**: Fits micro-structural models and stores outputs in `analysis/<analysis_subfolder>/`. Supported models: *Nexi*, *Sandi*, *Sandix*, *Smex*, *SMI*, (*DTI* and *DKI* are done by default). Does not require Step3_registrations to be done.
+- **Step4_modelling**: Fits micro-structural models and stores outputs in `analysis/<analysis_subfolder>/`. Supported models: *Nexi* (from SwissKnife toolbox), *Sandi* (from SwissKnife toolbox), *Sandi_MP* (from Marco Palombo's Matlab implementation), *Sandix* (from SwissKnife toolbox), *Smex* (from SwissKnife toolbox), *SMI* (from TMI/Designer toolbox), (*DTI* and *DKI* are done by default with TMI/Designer toolbox). Does not require Step3_registrations to be done.
 
 - **Step5_get_estimates**: Extracts model estimates within regions of interest. Requires atlas registration from Step3_registrations.
 

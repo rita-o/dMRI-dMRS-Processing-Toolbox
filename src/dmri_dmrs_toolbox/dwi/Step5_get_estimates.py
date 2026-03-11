@@ -286,9 +286,9 @@ def Step5_get_estimates(cfg):
                                 #axs[k].set_yscale('log')
                                 row = k // n_cols
                                 col = k % n_cols
-                                axs[k].set_ylim([0.02, 1])
+                                axs[k].set_ylim([0.02, 0.7])
                                 axs[k].set_xticks(bvals_split[i])
-                                axs[k].set_yticks([0.02, 0.1, 1])
+                                #axs[k].set_yticks([0.02, 0.1, 1])
                                 if col == 0:
                                    axs[k].set_ylabel(r'$S / S_0$', fontdict={'size': 10, 'weight': 'bold', 'style': 'italic'})
                                    if row==0:
@@ -370,9 +370,9 @@ def Step5_get_estimates(cfg):
                                 #axs[k].set_yscale('log')
                                 row = k // n_cols
                                 col = k % n_cols
-                                axs[k].set_ylim([0.02, 1])
+                                axs[k].set_ylim([0.02, 0.7])
                                 axs[k].set_xticks(1 / np.sqrt(bvals_split[i]))
-                                axs[k].set_yticks([0.02, 0.1, 1])
+                                #axs[k].set_yticks([0.02, 0.1, 1])
                                 if col == 0:
                                    axs[k].set_ylabel(r'$S / S_0$', fontdict={'size': 10, 'weight': 'bold', 'style': 'italic'})
                                    if row==0:

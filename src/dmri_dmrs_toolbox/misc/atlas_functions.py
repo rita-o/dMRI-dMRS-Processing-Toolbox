@@ -681,6 +681,7 @@ def create_ROI_mask(atlas, atlas_labels, TPMs, ROI, tpm_thr, bids_strc_reg):
            'Pallidum': ['Pallidum'],
            'Hypothalamus': ['Hypothalamus'],
            'Hippocampal Form': ['Hippocampal_Formation'],
+           'Striatum':['Striatum'],
            'CC': ['Corpus_Callosum'],
 
        } 

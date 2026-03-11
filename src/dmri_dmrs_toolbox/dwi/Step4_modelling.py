@@ -12,6 +12,7 @@ import subprocess
 import shutil
 import glob
 import fnmatch
+from pathlib import Path
 from dmri_dmrs_toolbox.misc.bids_structure import create_bids_structure
 from dmri_dmrs_toolbox.misc.custom_functions import (
     create_directory,
@@ -26,6 +27,7 @@ from dmri_dmrs_toolbox.misc.custom_functions import (
     calculate_pwd_avg,
     compute_micro_FA,
     get_param_names_model,
+    copy_file
 )
 from importlib.resources import files
 from dmri_dmrs_toolbox.misc.atlas_functions import prepare_atlas_labels, create_ROI_mask
@@ -337,7 +339,7 @@ def Step4_modelling(cfg):
                         others     = '-echo_time 51,51 -bshape 1,0 -compartments EAS,IAS -debug'
                
                     # Run SwissKnife models
-                    if 'Nexi'in model or 'Sandi' in model or 'Smex' in model or 'Sandix' in model:  
+                    if 'Nexi'in model or model=='Sandi' or 'Smex' in model or 'Sandix' in model:  
                         
                         # Define arguments 
                         args = [model, 
@@ -405,7 +407,85 @@ def Step4_modelling(cfg):
                             "python", str(script_path)
                         ] + args
                         subprocess.run(command, check=True)
-                     
+                        
+                    # Run matlab models
+                    elif model=='Sandi_MP':  
+   
+                        # Put in the format Sandi toolbox wants
+                        bvecs       = copy_files_BIDS(bids_strc_prep,input_path,'bvecsRotated.txt')
+                        for file in [sigma, dwi, bvals, bvecs, mask]:
+                            src = Path(file)
+                            sub = [p for p in src.parts if p.startswith("sub-")][0]
+                            ses = [p for p in src.parts if p.startswith("ses-")][0]
+                            acq = "acq-01"
+                            run = "run-01"
+                            if file==sigma:
+                                ending='noisemap.nii.gz'
+                            elif file==dwi:
+                                ending='dwi.nii.gz'
+                            elif file==mask:
+                                ending='mask.nii.gz'
+                            elif file==bvals:
+                                ending='dwi.bval'
+                            elif file==bvecs:
+                                ending='dwi.bvec'
+                            new_name = f"{sub}_{ses}_{acq}_{run}_desc-preproc_{ending}"
+                            
+                            dst_dir = src.parent.parent / "derivatives" / "preprocessed" / sub / ses
+                            create_directory(dst_dir)
+                          
+                            dst = dst_dir / new_name
+                            shutil.copy2(src, dst)   # copy, do not move
+
+                        big_delta_val = float(np.loadtxt(big_delta)[0])
+                        small_delta_val = float(np.loadtxt(small_delta)[0])
+                        
+                        # # rename the folder inputs → preprocessed
+                        # inputs_dir = src.parent
+                        # preproc_dir = inputs_dir.parent / "derivatives"
+                        # inputs_dir.rename(preproc_dir)
+                        
+                        # Matlab command
+                        sandi_folder = src.parent.parent
+                        matlab_cmd = (
+                            "try, "
+                            f"addpath(genpath('{os.path.join(cfg['toolboxes'], 'SANDI')}')); "
+                            f"SANDI_batch_analysis('{sandi_folder}', {big_delta_val}, {small_delta_val}, []); "
+                            "catch, exit(1), end, exit(0);"
+                        )
+                        cmd = [
+                             "matlab", "-nodisplay", "-nosplash", "-nodesktop",
+                             "-r", matlab_cmd
+                        ]
+                        # Run matlab command
+                        subprocess.run(cmd)
+                        
+                        # Put the files in the normal format
+                        src_dir = sandi_folder / "derivatives" / 'SANDI_analysis' / sub / ses / 'SANDI_Output'  
+                        dst_dir = sandi_folder 
+                        
+                        pattern_map = {
+                            "SANDI-fit_Din.nii.gz": "sandi_di.nii.gz",
+                            "SANDI-fit_De.nii.gz": "sandi_de.nii.gz",
+                            "SANDI-fit_fneurite.nii.gz": "sandi_fneurite.nii.gz",
+                            "SANDI-fit_fsoma.nii.gz": "sandi_fsoma.nii.gz",
+                            "SANDI-fit_Rsoma.nii.gz": "sandi_rs.nii.gz",
+                        }
+
+                        for pattern, new_name in pattern_map.items():
+                            matches = glob.glob(str(src_dir / pattern))
+                        
+                            if not matches:
+                                print(f"No file found for pattern: {pattern}")
+                                continue
+                        
+                            src = Path(matches[0])
+                        
+                            dst = dst_dir / new_name
+                        
+                            shutil.move(src, dst)
+                        
+                            print(f"Moved: {src} -> {dst}")
 
                 # Mask output for better visualization
                 patterns, lims, maximums = get_param_names_model(model,cfg['is_alive'])

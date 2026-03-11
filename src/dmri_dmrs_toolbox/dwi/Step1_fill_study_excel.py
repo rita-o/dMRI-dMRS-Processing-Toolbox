@@ -50,7 +50,7 @@ def Step1_fill_study_excel(cfg):
                         list_methods.at[ii, 'acqSeq'] = seq_name
         
         # Extract methods for the dMRI sequence
-        if seq_name.find('DTI_EPI') != -1 or seq_name.find('DtiEpi') != -1:
+        if seq_name.find('DTI_EPI') != -1 or seq_name.find('DtiEpi') != -1 or seq_name.find('REVPE') != -1:
     
             with open(os.path.join(scan_path, 'method'), 'r') as f: 
                 for line in f:
