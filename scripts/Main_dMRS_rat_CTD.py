@@ -21,7 +21,7 @@ os.system('cls')
 ########################## SCRIPT CONFIGURATION (EDIT AS APPPROPRIATE) ##########################
 
 #### DATA PATH AND SUBJECTS ####
-subj_list = [f'sub-{i:02d}' for i in [8,10,11,12,14,15]]#[3,4,5,6,7,8,10,11,12,14,15]]    # list of subjects to analyse
+subj_list = [f'sub-{i:02d}' for i in [3,4,5,6,7,8,10,11,12,14,15]]    # list of subjects to analyse [8,10,11,12,14,15]]#
 
 cfg                         = {}
 cfg['subj_list']            = subj_list
@@ -33,9 +33,10 @@ cfg['scan_list_name']       = 'ScanList_CTD.xlsx'   # name of the excel file con
 
 #### DMRS PREPROCESSING CONFIG ####  
 cfg['basis_set']            = os.path.join(cfg['common_folder'], 'mrs_basis_sets','Basis_Set_dSPECIAL_differentTM')     # path to where the basis set are
-cfg['models']               = ["dti","stick", "dki","cylinder","cylinder_sphere","stick_sphere"]    # models used for fitting
+cfg['models']               = ["cylinder", "cylinder_sphere", "sphere_stick", "dti", "stick", "dki",]    # models used for fitting
 cfg['metabolites']          = ['NAA+NAAG','Glu','Ins','GPC+PCho','Cr+PCr','Tau','Gln']              # metabolites for analysis
 cfg['redo_processing']      = 0  # 1 to remove previous file and redo all processing (Step1); 0 to process only missing TMs
+cfg['b_max']                = 20 # introduces a cutoff b-value in all model fits, if 0 no limit is applied
 
 #### SOFTWARES ####
 cfg['toolboxes']            = "/home/localadmin/Software/"                              # path to where some toolboxes from matlab are (including MPPCA and tMPPCA)
@@ -47,7 +48,7 @@ with open(cfg['data_path'] + '/.config_mrs.json', 'w') as f:
     json.dump(cfg, f)
 
 #### STEP 1. Process and quantify bruker data
-Step1_preproc(cfg)
+#Step1_preproc(cfg)
 
 #### STEP 2. Fitting of data 
 Step2_fitting(cfg)

@@ -33,7 +33,7 @@ cfg['scan_list_name']       = 'ScanList_BDL.xlsx'   # name of the excel file con
 
 #### DMRS PREPROCESSING CONFIG ####  
 cfg['basis_set']            = os.path.join(cfg['common_folder'], 'mrs_basis_sets','Basis_Set_dSPECIAL_differentTM')     # path to where the basis set are
-cfg['models']               = ["dti","stick", "dki","cylinder","cylinder_sphere","stick_sphere"]    # models used for fitting
+cfg['models']               = ["cylinder_sphere","stick_sphere"]#"dti","stick", "dki","cylinder","cylinder_sphere","stick_sphere"]    # models used for fitting
 cfg['metabolites']          = ['NAA+NAAG','Glu','Ins','GPC+PCho','Cr+PCr','Tau','Gln']              # metabolites for analysis
 cfg['redo_processing']      = 0  # 1 to remove previous file and redo all processing (Step1); 0 to process only missing TMs
 
@@ -47,7 +47,7 @@ with open(cfg['data_path'] + '/.config_mrs.json', 'w') as f:
     json.dump(cfg, f)
 
 #### STEP 1. Process and quantify bruker data
-Step1_preproc(cfg)
+#Step1_preproc(cfg)
 
 #### STEP 2. Fitting of data 
 Step2_fitting(cfg)

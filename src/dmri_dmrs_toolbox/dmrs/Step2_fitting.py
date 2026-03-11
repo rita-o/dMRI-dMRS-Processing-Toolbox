@@ -106,12 +106,24 @@ def Step2_fitting(cfg):
                 print(f"Fiitting model: {model}...")
                 mc_draws=2
 
+                this_spec = dmrsmodel.model_specs[model]
+                if cfg['b_max'] is not None:
+                    if cfg['b_max']>0:
+                        print("Applying b-value cutoff in all models of", cfg['b_max'], "ms/µm².")
+                        if "b_max" in this_spec.options.keys():
+                            this_spec.options["b_max"] = np.min([this_spec.options["b_max"],cfg['b_max']])
+                        else:
+                            this_spec.options["b_max"]=cfg['b_max']
+
                 dmrsmodel.apply_model(
                     model,
-                    print_results=True,
+                    modified_spec=this_spec
                 )
             
-                dmrsmodel.calculate_uncertainties(model, monte_carlo_draws=mc_draws)
+                dmrsmodel.calculate_uncertainties(
+                    model,
+                    monte_carlo_draws=mc_draws,
+                    modified_spec=this_spec)
                 create_directory(os.path.join(path_modeling_results,model))
                 dmrsmodel.plot_results(model, os.path.join(path_modeling_results,model))
                 dmrsmodel.print_results(model)

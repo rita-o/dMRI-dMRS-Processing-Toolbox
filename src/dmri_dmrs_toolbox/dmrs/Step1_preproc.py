@@ -79,7 +79,7 @@ def Step1_preproc(cfg):
                                     (subj_data['dMRS_acq_type'] == 'water') &
                                     (subj_data['TM'] == TM) 
                                      ].reset_index(drop=True)
-                water_reference_sequence_number =  subj_data_water['scanNo'].iloc[0]
+                #water_reference_sequence_number =  subj_data_water['scanNo'].iloc[0]
                 
                 # Get the scan numbers for the metabolite data 
                 subj_data_metab = subj_data[

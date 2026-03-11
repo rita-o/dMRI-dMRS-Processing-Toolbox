@@ -131,6 +131,17 @@ def sphere_stick_signal(params, b_values, diffusion_times, ctx):
     s_stick[nz] = np.sqrt(np.pi) / (2 * sqrtbD[nz]) * erf(sqrtbD[nz])
     return amp * (f_s * s_sphere + (1 - f_s) * s_stick)
 
+def sphere_stick_sandi_signal(params, b_values, diffusion_times, ctx):
+    amp, f_s, r, D_stick = params
+    D_soma = 0.5
+    sd = ctx.get("small_delta", 3)
+    s_sphere = sphere_murdaycotts(r, D_soma, b_values, diffusion_times, sd)
+    sqrtbD = np.sqrt(b_values * D_stick)
+    s_stick = np.ones_like(sqrtbD)
+    nz = sqrtbD != 0
+    s_stick[nz] = np.sqrt(np.pi) / (2 * sqrtbD[nz]) * erf(sqrtbD[nz])
+    return amp * (f_s * s_sphere + (1 - f_s) * s_stick)
+
 def cylinder_isotropic_signal(params, b_values, diffusion_times, ctx):
     amp, r, D_intra = params
     sd = ctx.get("small_delta", 3)
@@ -183,7 +194,7 @@ stick_spec = ModelSpec(
     name="stick",
     param_names=["amp","D_intra"],
     param_units=["a.u.","µm²/ms"],
-    param_names_latex=["S_0","D_\mathrm{intra}"],
+    param_names_latex=["S_0",r"D_\mathrm{intra}"],
     param_units_latex=["a.u.",r"\micro\metre\squared\per\milli\second"],
     initial_guess=[1.0, 0.5],
     bounds=[(0.1, 1.5), (0.001, 2.0)],
@@ -194,17 +205,31 @@ stick_spec = ModelSpec(
 )
 
 sphere_stick_spec = ModelSpec(
-    name="stick_sphere",
+    name="sphere_stick",
     param_names=["amp","f_s","r","D_intra"],
     param_units=["a.u.","","µm","µm²/ms"],
-    param_names_latex=["S_0",r"f_\mathrm{S}",r"r","D_\mathrm{intra}"],
+    param_names_latex=["S_0",r"f_\mathrm{S}",r"r",r"D_\mathrm{intra}"],
     param_units_latex=["a.u.","",r"\micro\metre",r"\micro\metre\squared\per\milli\second"],
-    initial_guess=[1.0, 0.2, 10.0, 0.5],
+    initial_guess=[1.0, 0.2, 3.0, 0.5],
     bounds=[(0.01, 1.5), (0.0001, 1.0), (0.01, 20.0), (0.01, 1.5)],
     signal_fn=sphere_stick_signal,
     options=dict(per_diffusion=False),
     label="shpere + random-oriented sticks",
     label_short="Sphere + ROS"
+)
+
+sphere_stick_sandi_spec = ModelSpec(
+    name="sphere_stick_sandi",
+    param_names=["amp","f_s","r","D_stick"],
+    param_units=["a.u.","","µm","µm²/ms"],
+    param_names_latex=["S_0",r"f_\mathrm{S}",r"r",r"D_\mathrm{stick}"],
+    param_units_latex=["a.u.","",r"\micro\metre",r"\micro\metre\squared\per\milli\second"],
+    initial_guess=[1.0, 0.2, 3.0, 0.5],
+    bounds=[(0.01, 1.5), (0.0001, 1.0), (0.01, 20.0), (0.01, 1.5)],
+    signal_fn=sphere_stick_signal,
+    options=dict(per_diffusion=False),
+    label="shpere + random-oriented sticks with fixed Dsoma (SANDI style)",
+    label_short="Sphere + ROS (SANDI style)"
 )
 
 cylinder_spec = ModelSpec(
@@ -225,7 +250,7 @@ cylinder_sphere_spec = ModelSpec(
     name="cylinder_sphere",
     param_names=["amp","f_s","r_s","r_c","D_intra"],
     param_units=["a.u.","","µm","µm","µm²/ms"],
-    param_names_latex=["S_0",r"f_\mathrm{S}",r"r_\mathrm{S}",r"r_\mathrm{C}","D_\mathrm{intra}"],
+    param_names_latex=["S_0",r"f_\mathrm{S}",r"r_\mathrm{S}",r"r_\mathrm{C}",r"D_\mathrm{intra}"],
     param_units_latex=["a.u.","",r"\micro\metre",r"\micro\metre",r"\micro\metre\squared\per\milli\second"],
     initial_guess=[1.0, 0.1, 15.0, 2.0, 0.5],
     bounds=[(0.01, 5.0),(0.0,1.0),(0.001,50.0),(1e-18,10.0),(0.001,2.5)],
@@ -305,6 +330,10 @@ def fit_model_over_metabolites(dataset,
     b_all = dataset.all_b_values
     diffusion_times = dataset.all_diffusion_times
 
+    if 'b_max' in spec.options.keys():
+        diffusion_times = diffusion_times[b_all<=spec.options['b_max']]
+        b_cut = b_all[b_all <= spec.options['b_max']]
+
     # optional context passed to signal_fn
     ctx = dict(
         small_delta=dataset.small_delta if hasattr(dataset, "small_delta") else 3,
@@ -320,14 +349,15 @@ def fit_model_over_metabolites(dataset,
             print(f"{parameter}: {initial_guess[i]} {spec.param_units[i]}")
 
     for metab in list(dataset.metabolites):  # copy to allow removal
+        signal = np.copy(dataset.signal[metab])
+        if 'b_max' in spec.options.keys():
+            signal = signal[b_all <= spec.options['b_max']]
         if not per_diffusion:
             # one fit across all diffusion times
             def objective(params):
-                raw = spec.signal_fn(params, b_all, diffusion_times, ctx)
-                sig = normalize_by_b(raw, b_all, diffusion_times, normalization_index) if normalize else raw
-                residuals = dataset.signal[metab] - sig
-                if 'b_max' in spec.options.keys():
-                    residuals = residuals[b_all<=spec.options['b_max']]
+                raw = spec.signal_fn(params, b_cut, diffusion_times, ctx)
+                sig = normalize_by_b(raw, b_cut, diffusion_times, normalization_index) if normalize else raw
+                residuals = signal - sig
                 return 0.5 * np.sum(residuals**2)
 
             res = minimize(objective, initial_guess, method='L-BFGS-B', bounds=spec.bounds)
@@ -347,12 +377,10 @@ def fit_model_over_metabolites(dataset,
                     data = dataset.signal[metab][mask_dt]
 
                     residuals = data - sig
-                    if 'b_max' in spec.options.keys():
-                        residuals = residuals[b_this <= spec.options['b_max']]
                     return 0.5 * np.sum(residuals ** 2)
 
                 res = minimize(objective, initial_guess, method='L-BFGS-B', bounds=spec.bounds)
-                res.success = fit_success_boundary_check(res, spec.bounds, initial_guess)
+                #res.success = fit_success_boundary_check(res, spec.bounds, initial_guess)
                 results[metab][diffusion] = res if res.success else None
     return results
 
@@ -364,7 +392,8 @@ class DMRSModel:
         self.results = {}
         self.model_specs = {
             "stick": stick_spec,
-            "stick_sphere": sphere_stick_spec,
+            "sphere_stick": sphere_stick_spec,
+            "sphere_stick_sandi": sphere_stick_sandi_spec,
             "cylinder": cylinder_spec,
             "cylinder_sphere": cylinder_sphere_spec,
             "dki": dki_spec,
@@ -374,10 +403,14 @@ class DMRSModel:
         self.diffusion_time_increment = 5 # ms, time to add to mixing time to obtain diffusion time
 
     def apply_model(self, model, initial_guess=None,
-                    normalization_index=0, exclude_Mac=True, print_results=False):
+                    normalization_index=0, exclude_Mac=True,
+                    modified_spec=None):
         if exclude_Mac and 'Mac' in self.dataset.metabolites:
             self.dataset.metabolites.remove('Mac')
-        spec = self.model_specs[model]
+        if modified_spec is None:
+            spec = self.model_specs[model]
+        else:
+            spec = modified_spec
         if initial_guess is None:
             initial_guess = spec.initial_guess
 
@@ -390,6 +423,8 @@ class DMRSModel:
         for metab in self.dataset.metabolites:
             if spec.options['per_diffusion']:
                 for diffusion in self.dataset.diffusion_times:
+                    if self.results[model][metab][diffusion] is None:
+                        print("catch")
                     self.results[model][metab][diffusion].sig = None
             else:
                 self.results[model][metab].sig = None
@@ -424,10 +459,21 @@ class DMRSModel:
         else:
             print("Error: Could not initialize, unknown DMRS dataset type.")
 
-    def calculate_uncertainties(self,model,initial_guess=None,monte_carlo_draws=100):
+    def calculate_uncertainties(
+            self,
+            model,
+            initial_guess=None,
+            monte_carlo_draws=100,
+            modified_spec=None
+    ):
         b_all = self.dataset.all_b_values
         diffusion_times = self.dataset.all_diffusion_times
-        spec = self.model_specs[model]
+
+        if modified_spec is None:
+            spec = self.model_specs[model]
+        else:
+            spec = modified_spec
+
         if initial_guess is None:
             initial_guess = spec.initial_guess
         # optional context passed to signal_fn
@@ -441,8 +487,11 @@ class DMRSModel:
                 raw = spec.signal_fn(self.results[model][metab].x, b_all, diffusion_times, ctx)
                 sig = normalize_by_b(raw, b_all, diffusion_times, normalization_index)
                 residuals = self.dataset.signal[metab] - sig
-                if 'b_max' in spec.options.keys():
+                """if 'b_max' in spec.options.keys():
                     residuals = residuals[b_all <= spec.options['b_max']]
+                    raw = raw[b_all <= spec.options['b_max']]
+                    sig = sig[b_all <= spec.options['b_max']]
+                    b_all=b_all[b_all <= spec.options['b_max']]"""
                 params_mc = []
                 for i in range(monte_carlo_draws):
                     residuals_nonzero_b = residuals[b_all !=0]
@@ -594,7 +643,7 @@ class DMRSModel:
                     )
 
             plt.legend()
-            plt.title(f"{metab} dMRS data with {spec.label_short} model fit")
+            plt.title(f"{metab} dMRS data with {spec.label_short} fit")
             plt.xlabel('$b$ [ms / µm²]')
             plt.ylabel(r'$S/S(b_{\mathrm{min}})$')
             plt.yscale('log')
@@ -605,8 +654,7 @@ class DMRSModel:
             storepath.parent.mkdir(parents=True, exist_ok=True)
 
             plt.savefig(storepath)
-            if draft_mode:
-                plt.show()
+            plt.show()
             plt.close()
 
     def export_csvs(self, model, store_dir):
