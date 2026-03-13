@@ -94,4 +94,103 @@ for model in cfg['model_list']:
                 df_all_data = pd.concat([df_all_data, fit_parameters], ignore_index=True)
 
     ######## FOR ALL THE DATA OF THIS MODEL ########
-    print("hi")
+    plot_rows = []
+
+    for _, row in df_all_data.iloc[::2].iterrows(): # only take mean values for now
+        metab = row['Metabolite']
+        group = row['Group']
+        session = row['Session']
+        subject = row['Subject']
+
+        for param in params:
+            values = np.ravel(row[param])
+            for val in values:
+                plot_rows.append({
+                    "Parameter": param,
+                    "Metabolite": metab,
+                    "Group": group,
+                    "Session": session,
+                    "Subject": subject,
+                    "Model": model,
+                    "Value": float(val)
+                })
+    df_long = pd.DataFrame(plot_rows)
+
+    ## Create labels
+    group_counts = df_long[['Group', 'Subject']].drop_duplicates().groupby('Group').count()['Subject']
+
+    desired_order = ['WT', 'KI', 'HTZ', 'no group yet', 'no data']
+    HUE_ORDER = [g for g in desired_order if g in group_counts.index]
+
+    df_long['Group'] = (df_long['Group']
+                        .astype(str)
+                        .str.strip())
+    df_long['Group'] = pd.Categorical(df_long['Group'], categories=desired_order, ordered=True)
+
+    ## Plot
+    print('Plotting')
+    params = np.array(params)
+    plotting_params = params[np.where(params!="amp")]
+
+    fig, axes = plt.subplots(len(plotting_params), 1, figsize=(15, 15))
+    fig.subplots_adjust(wspace=0.05, hspace=0.11, top=0.95, bottom=0.1, left=0.05, right=0.95)
+
+    lims = dmrsmodel.model_specs[model].bounds
+    for i, (ax, param) in enumerate(zip(axes, params)):
+        lim
+
+        sns.boxplot(
+            data=df_long[df_long['Parameter'] == param],
+            x='Metabolite',
+            y='Value',
+            hue='Group',
+            hue_order=HUE_ORDER,
+            ax=ax,
+            #split=False,
+            #inner='quart',
+            #cut=0
+        )
+
+        metabs = df_long['Metabolite'].unique()
+        for metab in metabs:
+            data_roi = df_long[df_long['Metabolite'] == metab]
+            group_WT = data_roi[data_roi['Group'] == 'WT']['Value']
+            group_KI = data_roi[data_roi['Group'] == 'KI']['Value']
+
+            # Choose test (use Mann-Whitney U if non-normal, or t-test if assumptions met)
+            # if not group_WT.empty and not group_KI.empty:
+            #     result = mannwhitneyu(group_WT, group_KI, alternative='two-sided')  # non-parametric
+
+            #     pval = result.pvalue
+            #     effect_size = cohen_d(group_WT.values, group_KI.values)
+            #     if pval < 0.05 and abs(effect_size) >= 0.3:
+            #         # Get median y for positioning *
+            #         y_max = max(data_roi['Value'].max(), lim[1]) * 1.02
+            #         xpos = list(rois).index(roi)
+            #         ax.text(x=xpos, y=lim[1]*0.9, s='*', ha='center', va='bottom', fontsize=16, color='red')
+
+        if i == len(axes) - 1:
+            ax.set_xlabel("Metabolite", fontsize=11)
+            ax.tick_params(axis='x', rotation=30)
+            handles, lgn = ax.get_legend_handles_labels()
+            new_lgn = []
+            for l in lgn:
+                count = group_counts[l]
+                new_lgn.append(f"{l} (n={count})")
+            ax.legend(handles, new_lgn, loc='upper right')
+        else:
+            ax.set_xlabel("")
+            ax.set_xticklabels([])
+            ax.get_legend().remove()
+
+        ax.set_ylim(lim[0], lim[1] * 1.1)
+        ax.set_ylabel(dmrsmodel.model_specs[model].param_names_latex, fontsize=11)
+        ax.tick_params(axis='y', labelsize=11)
+        ax.tick_params(axis='x', labelsize=11)
+
+    fig.suptitle(f"{dmrsmodel.model_specs[model].label}", fontsize=16)
+    plt.savefig(os.path.join(output_folder, f'{model}_group_comparison.png'))
+    plt.show()
+
+
+
