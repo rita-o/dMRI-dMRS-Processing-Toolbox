@@ -142,8 +142,12 @@ This will install all these environments:
 The dMRS processing codes are provided as *compiled MATLAB executables*.  
 To run them, you **do not need a MATLAB license**, but you must install the MATLAB Runtime (R2025a)(⚠️ you need this specific runtime version): https://ch.mathworks.com/products/compiler/matlab-runtime.html
 
-➕EXTRA➕ A **MATLAB** license is required if using the MATLAB-based denoising options, with the [**MPPCA**](https://github.com/Neurophysics-CFIN/MP-PCA-Denoising) and [**tMPPCA**](https://github.com/Neurophysics-CFIN/Tensor-MP-PCA) toolboxes. If MATLAB is not available, denoising can instead be performed using **MRtrix** or **DESIGNER** (see `Step3.py`).  
-The pipeline previously also relied on [**md-dmri-master**](https://github.com/markus-nilsson/md-dmri/tree/master) and [**SPM12**](https://www.fil.ion.ucl.ac.uk/spm/software/spm12/) to compute *microscopic FA (µFA)* when *STE* data were acquired. These dependencies are now commented out in the scripts, as a *Python implementation of the µFA computation* has been integrated.
+🔸EXTRA🔸 A proper full **MATLAB** license is required if:  
+  **3.1.** Using the MATLAB-based denoising options, with the [**MPPCA**](https://github.com/Neurophysics-CFIN/MP-PCA-Denoising) and [**tMPPCA**](https://github.com/Neurophysics-CFIN/Tensor-MP-PCA) toolboxes. These toolboxes should be downloaded and placed in a directory that is specified in the main script configuration (cfg['toolboxes']). If MATLAB is not available, denoising can instead be performed using **MRtrix** or **DESIGNER** (see `Step3.py`).  
+  
+  **3.2.** Using SANDI matlab implementation of Marco Palombo [**SANDI**](https://github.com/palombom/SANDI-Matlab-Toolbox-Latest-Release). This toolbox should be downloaded and placed in a directory that is specified in the main script configuration (cfg['toolboxes']).
+  
+  (**3.3**. The pipeline previously also relied on [**md-dmri-master**](https://github.com/markus-nilsson/md-dmri/tree/master) and [**SPM12**](https://www.fil.ion.ucl.ac.uk/spm/software/spm12/) to compute *microscopic FA (µFA)* when *STE* data were acquired. These dependencies are now commented out in the scripts, as a *Python implementation of the µFA computation* has been integrated.)
 
 ### 4. Install the Toolbox
 
